@@ -9,13 +9,11 @@ router.get('/', (req, res) => {
     .catch(err=>res.status(500).json({message: "error"}));
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', validatePostById, (req, res) => {
   const {id} = req.params;
   Posts.getById(id)
-    .then(post => {
-      post ? res.status(200).json({post}) : res.status(404).json({message: 'no post with that id'})
+    .then(post => {res.status(200).json({post})})
     .catch(err => res.status(500).json({message: 'server error'}))
-    })
 });
 
 router.delete('/:id', (req, res) => {
@@ -25,32 +23,13 @@ router.delete('/:id', (req, res) => {
     .catch(err=>res.status(500).json({message:'server error'}))
 });
 
-router.put('/:id', validatePost, (req, res) => {
-  
+router.put('/:id', validatePostById, validatePost, (req, res) => {
   const {id} = req.params;
-  console.log('id', Number(id))
   const newPost = req.body;
-  console.log('req.body', req.body.text);
-
 
   Posts.update(id, newPost)
-    .then(post => {
-      console.log('the post', post);
-      if (post){
-        if(newPost.text){
-          res.status(200).json(post)
-          //never getting here, don't know why
-        } else {
-          res.status(400).json({message: 'need text'})
-        }
-      } else {
-        res.status(404).json({message: 'post at that id does not exist'})
-      }
-    })
+    .then(post => { res.status(200).json(post)})
     .catch(err => res.status(500).json({message: 'server error'}))
-
-  
-
 });
 
 
@@ -64,15 +43,28 @@ router.put('/:id', validatePost, (req, res) => {
 
 // custom middleware
 
+function validatePostById(req, res, next) {
+  const {id} = req.params;
+  Posts.getById(id)
+    .then(post =>{
+      req.post = post;
+      post ? next() : res.status(404).json({message:'no user with that ID'})
+    })
+    .catch(error=>{
+      console.log(error);
+      res.status(500).json({message: 'could not validate post id'})
+    })
+}
+
 function validatePost(req, res, next) {
-  console.log('from the validation function', req.body)
-  const theBody = req.body;
-  const keys = Object.keys(theBody);
-  if (keys.length > 0){
-    req.body.text ? next() : res.status(400).json({message: 'missing required text field'})
-  } else {
-    res.status(400).json({message: 'missing post data'})
+  const newPost = req.body;
+  const keys = Object.keys(newPost);
+  if (keys.length === 0){
+    return res.status(400).json({message: 'needs a body'})
+  } else if (!newPost.text){
+    return res.status(400).json({message:'needs some text'})
   }
+  next();
 }
 
 module.exports = router;
